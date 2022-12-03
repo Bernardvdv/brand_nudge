@@ -17,7 +17,7 @@ def create_connection_mysql():
     return conn
 
 
-def import_to_db(name, price, rating, guerentee, delivery, url):
+def import_to_db(name, price, rating, guerentee, delivery, url, batch_id):
     """Store each row of processed data."""
     try:
         date = datetime.now()
@@ -30,11 +30,12 @@ def import_to_db(name, price, rating, guerentee, delivery, url):
             ProductsGuarentee,
             ProductsDelivery,
             ProductsUrl,
+            ProductsBatchID,
             DateTimeInserted
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s);"""
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"""
 
-        params = (name, price, rating, guerentee, delivery, url, date)
+        params = (name, price, rating, guerentee, delivery, url, batch_id, date)
 
         mycursor.execute(sql, params)
         db_conn.commit()
@@ -47,6 +48,19 @@ def import_to_db(name, price, rating, guerentee, delivery, url):
         print("Message", err.msg)
         pass
 
+def get_batch_number():
+    """Get latest batch number and increment by 1."""
+    db_conn = create_connection_mysql()
+    mycursor = db_conn.cursor()
+    sql = """select max(ProductsBatchID) from products;"""
+
+    mycursor.execute(sql)
+    max_batch_id = mycursor.fetchall()
+
+    if not max_batch_id[0][0]:
+        max_batch_id = "0"
+    batch_id = int(max_batch_id[0][0]) + 1
+    return batch_id
 
 def prepare_data(soup):
     """Prepare soup object to allow easy processing."""
@@ -112,4 +126,12 @@ def validate_data(url_count, counter):
     """Validate lenght of URl's and count of scraped URL's are a match."""
     if url_count != counter:
         raise Exception("Sorry, looks like not all URL's where collected")
+    return
+
+def update_audit_table(batch_id):
+    """Update audit table with scraped stats."""
+    db_conn = create_connection_mysql()
+    mycursor = db_conn.cursor()
+    mycursor.callproc('UpdateBatchID', [batch_id, ])
+    db_conn.commit()
     return

@@ -35,7 +35,7 @@ def main():
     # Create list of URL's from prepared data
     url_list = helpers.get_urls(products)
     url_count = len(url_list)
-
+    batch_id = helpers.get_batch_number()
     for url in url_list:
         r = requests.get(
             url,
@@ -53,14 +53,16 @@ def main():
             row_data[2],
             row_data[3],
             row_data[4],
-            url
+            url,
+            batch_id
         )
-        # Attempt to prevent rate limiting
         counter += 1
+        # Attempt to prevent rate limiting
         time.sleep(1)
     # Confirm if all URL's were scraped
     helpers.validate_data(url_count, counter)
-
+    # Update audit table with number of rows inserted and batch ID
+    helpers.update_audit_table(batch_id)
 
 if __name__ == "__main__":
     main()
