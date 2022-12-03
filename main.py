@@ -1,5 +1,8 @@
-from bs4 import BeautifulSoup as bs
+"""John Lewis product main scraper file."""
+
+from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
+
 import requests
 import lxml
 import time
@@ -16,25 +19,48 @@ db_conn = helpers.create_connection_mysql()
 mycursor = db_conn.cursor()
 
 
-r = requests.get(constants.URL, headers=headers, timeout=20, allow_redirects=True,)
-soup = bs(r.text, "lxml")
+def main():
+    """Initiate scraper and validate data."""
+    counter = 0
+    r = requests.get(
+        constants.URL,
+        headers=headers,
+        timeout=20,
+        allow_redirects=True
+    )
+    soup = BeautifulSoup(r.text, "lxml")
 
-products = helpers.prepare_data(soup)
+    # Get schema data and convert to nested list
+    products = helpers.prepare_data(soup)
+    # Create list of URL's from prepared data
+    url_list = helpers.get_urls(products)
+    url_count = len(url_list)
 
-for product in products:
-    url = product["url"]
-    r = requests.get(url, headers=headers, timeout=20, allow_redirects=True,)
-    soup = bs(r.text, "lxml")
+    for url in url_list:
+        r = requests.get(
+            url,
+            headers=headers,
+            timeout=20,
+            allow_redirects=True
+        )
+        soup = BeautifulSoup(r.text, "lxml")
 
-    p_grid = soup.find("div", {"id": "layout"})
-    p_name = p_grid.find("h1", {"data-testid": "product:title"}).text
-    p_prize = p_grid.find("span", {"data-testid": "product:price"}).text
-    p_rating = p_grid.find("div", {"data-testid": "product:starRatings"}).get("title")
-    p_guarentees = p_grid.find(
-        "p", {"data-testid": "product:included-guarantees:title"}
-    ).text
-    p_delivery = p_grid.find("div", {"data-testid": "product:delivery-message"}).text
-    # Push row data to DB
-    helpers.import_to_db(p_name, p_prize, p_rating, p_guarentees, p_delivery, url)
-    # Attempt to prevent rate limiting
-    time.sleep(5)
+        row_data = helpers.get_row_data(soup)
+        # Push row data to DB
+        helpers.import_to_db(
+            row_data[0],
+            row_data[1],
+            row_data[2],
+            row_data[3],
+            row_data[4],
+            url
+        )
+        # Attempt to prevent rate limiting
+        counter += 1
+        time.sleep(1)
+    # Confirm if all URL's were scraped
+    helpers.validate_data(url_count, counter)
+
+
+if __name__ == "__main__":
+    main()
